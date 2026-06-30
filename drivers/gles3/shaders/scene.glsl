@@ -2181,6 +2181,23 @@ vec4 textureArray_bicubic(sampler2DArray tex, vec3 uv, vec2 texture_size) {
 			(g1(fuv.y) * (g0x * texture(tex, vec3(p2, uv.z)) + g1x * texture(tex, vec3(p3, uv.z))));
 }
 #endif //LIGHTMAP_BICUBIC_FILTER
+
+#ifdef TEXTURE_SIZE_USED
+vec4 sample_lightmap_array(sampler2DArray tex, vec3 uv, vec2 texture_size) {
+	ivec3 texel = ivec3(floor(uv.xy * texture_size), int(uv.z));
+	return texelFetch(tex, texel, 0);
+}
+#else
+#ifdef LIGHTMAP_BICUBIC_FILTER
+vec4 sample_lightmap_array(sampler2DArray tex, vec3 uv, vec2 texture_size) {
+	return textureArray_bicubic(tex, uv, texture_size);
+}
+#else
+vec4 sample_lightmap_array(sampler2DArray tex, vec3 uv, vec2 texture_size) {
+	return textureLod(tex, uv, 0.0);
+}
+#endif
+#endif
 #endif // RENDER_MOTION_VECTORS
 
 void main() {
@@ -2529,17 +2546,10 @@ void main() {
 #ifdef USE_SH_LIGHTMAP
 		uvw.z *= 4.0; // SH textures use 4 times more data.
 
-#ifdef LIGHTMAP_BICUBIC_FILTER
-		vec3 lm_light_l0 = textureArray_bicubic(lightmap_textures, uvw + vec3(0.0, 0.0, 0.0), lightmap_texture_size).rgb;
-		vec3 lm_light_l1n1 = (textureArray_bicubic(lightmap_textures, uvw + vec3(0.0, 0.0, 1.0), lightmap_texture_size).rgb - vec3(0.5)) * 2.0;
-		vec3 lm_light_l1_0 = (textureArray_bicubic(lightmap_textures, uvw + vec3(0.0, 0.0, 2.0), lightmap_texture_size).rgb - vec3(0.5)) * 2.0;
-		vec3 lm_light_l1p1 = (textureArray_bicubic(lightmap_textures, uvw + vec3(0.0, 0.0, 3.0), lightmap_texture_size).rgb - vec3(0.5)) * 2.0;
-#else
-		vec3 lm_light_l0 = textureLod(lightmap_textures, uvw + vec3(0.0, 0.0, 0.0), 0.0).rgb;
-		vec3 lm_light_l1n1 = (textureLod(lightmap_textures, uvw + vec3(0.0, 0.0, 1.0), 0.0).rgb - vec3(0.5)) * 2.0;
-		vec3 lm_light_l1_0 = (textureLod(lightmap_textures, uvw + vec3(0.0, 0.0, 2.0), 0.0).rgb - vec3(0.5)) * 2.0;
-		vec3 lm_light_l1p1 = (textureLod(lightmap_textures, uvw + vec3(0.0, 0.0, 3.0), 0.0).rgb - vec3(0.5)) * 2.0;
-#endif
+		vec3 lm_light_l0 = sample_lightmap_array(lightmap_textures, uvw + vec3(0.0, 0.0, 0.0), lightmap_texture_size).rgb;
+		vec3 lm_light_l1n1 = (sample_lightmap_array(lightmap_textures, uvw + vec3(0.0, 0.0, 1.0), lightmap_texture_size).rgb - vec3(0.5)) * 2.0;
+		vec3 lm_light_l1_0 = (sample_lightmap_array(lightmap_textures, uvw + vec3(0.0, 0.0, 2.0), lightmap_texture_size).rgb - vec3(0.5)) * 2.0;
+		vec3 lm_light_l1p1 = (sample_lightmap_array(lightmap_textures, uvw + vec3(0.0, 0.0, 3.0), lightmap_texture_size).rgb - vec3(0.5)) * 2.0;
 
 		vec3 n = normalize(lightmap_normal_xform * indirect_normal);
 
@@ -2548,11 +2558,7 @@ void main() {
 		ambient_light += lm_light_l1_0 * n.z * (lm_light_l0 * lightmap_exposure_normalization * 4.0);
 		ambient_light += lm_light_l1p1 * n.x * (lm_light_l0 * lightmap_exposure_normalization * 4.0);
 #else
-#ifdef LIGHTMAP_BICUBIC_FILTER
-		ambient_light += textureArray_bicubic(lightmap_textures, uvw, lightmap_texture_size).rgb * lightmap_exposure_normalization;
-#else
-		ambient_light += textureLod(lightmap_textures, uvw, 0.0).rgb * lightmap_exposure_normalization;
-#endif
+		ambient_light += sample_lightmap_array(lightmap_textures, uvw, lightmap_texture_size).rgb * lightmap_exposure_normalization;
 #endif
 	}
 #endif // USE_LIGHTMAP
@@ -2823,11 +2829,7 @@ void main() {
 		uvw.xy = uv2 * lightmap_uv_scale.zw + lightmap_uv_scale.xy;
 		uvw.z = float(lightmap_slice);
 
-#ifdef LIGHTMAP_BICUBIC_FILTER
-		shadowmask = textureArray_bicubic(shadowmask_textures, uvw, lightmap_texture_size).x;
-#else
-		shadowmask = textureLod(shadowmask_textures, uvw, 0.0).x;
-#endif
+		shadowmask = sample_lightmap_array(shadowmask_textures, uvw, lightmap_texture_size).x;
 	}
 #endif //USE_LIGHTMAP
 
