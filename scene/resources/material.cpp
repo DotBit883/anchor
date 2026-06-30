@@ -1603,11 +1603,11 @@ void fragment() {)";
 		if (flags[FLAG_UV1_USE_TRIPLANAR]) {
 			code += R"(
 	vec4 albedo_tex = triplanar_texture(texture_albedo, uv1_power_normal, uv1_triplanar_pos);
+	LIGHT_UV = triplanar_shadow_uv(uv1_power_normal, uv1_triplanar_pos);
 )";
 		} else {
 			code += R"(
 	vec4 albedo_tex = texture(texture_albedo, base_uv);
-	LIGHT_UV = triplanar_shadow_uv(uv1_power_normal, uv1_triplanar_pos);
 )";
 		}
 	}
