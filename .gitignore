@@ -396,3 +396,7 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 *.generated.props
+
+# Steam SDK
+modules/godotsteam/sdk/*
+modules/godotsteam/!sdk/put SDK here
