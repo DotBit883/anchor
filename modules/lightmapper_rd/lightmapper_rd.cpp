@@ -68,7 +68,7 @@ void LightmapperRD::add_mesh(const MeshData &p_mesh) {
 	mesh_instances.push_back(mi);
 }
 
-void LightmapperRD::add_directional_light(const String &p_name, bool p_static, const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, float p_angular_distance, float p_shadow_blur) {
+void LightmapperRD::add_directional_light(const String &p_name, bool p_static, const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, float p_angular_distance, float p_shadow_blur, uint32_t p_shadow_caster_mask) {
 	Light l;
 	l.type = LIGHT_TYPE_DIRECTIONAL;
 	l.direction[0] = p_direction.x;
@@ -82,6 +82,7 @@ void LightmapperRD::add_directional_light(const String &p_name, bool p_static, c
 	l.static_bake = p_static;
 	l.size = Math::tan(Math::deg_to_rad(p_angular_distance));
 	l.shadow_blur = p_shadow_blur;
+	l.shadow_caster_mask = p_shadow_caster_mask;
 	lights.push_back(l);
 
 	LightMetadata md;
@@ -90,7 +91,7 @@ void LightmapperRD::add_directional_light(const String &p_name, bool p_static, c
 	light_metadata.push_back(md);
 }
 
-void LightmapperRD::add_omni_light(const String &p_name, bool p_static, const Vector3 &p_position, const Color &p_color, float p_energy, float p_indirect_energy, float p_range, float p_attenuation, float p_size, float p_shadow_blur) {
+void LightmapperRD::add_omni_light(const String &p_name, bool p_static, const Vector3 &p_position, const Color &p_color, float p_energy, float p_indirect_energy, float p_range, float p_attenuation, float p_size, float p_shadow_blur, uint32_t p_shadow_caster_mask) {
 	Light l;
 	l.type = LIGHT_TYPE_OMNI;
 	l.position[0] = p_position.x;
@@ -106,6 +107,7 @@ void LightmapperRD::add_omni_light(const String &p_name, bool p_static, const Ve
 	l.static_bake = p_static;
 	l.size = p_size;
 	l.shadow_blur = p_shadow_blur;
+	l.shadow_caster_mask = p_shadow_caster_mask;
 	lights.push_back(l);
 
 	LightMetadata md;
@@ -114,7 +116,7 @@ void LightmapperRD::add_omni_light(const String &p_name, bool p_static, const Ve
 	light_metadata.push_back(md);
 }
 
-void LightmapperRD::add_spot_light(const String &p_name, bool p_static, const Vector3 &p_position, const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, float p_range, float p_attenuation, float p_spot_angle, float p_spot_attenuation, float p_size, float p_shadow_blur) {
+void LightmapperRD::add_spot_light(const String &p_name, bool p_static, const Vector3 &p_position, const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, float p_range, float p_attenuation, float p_spot_angle, float p_spot_attenuation, float p_size, float p_shadow_blur, uint32_t p_shadow_caster_mask) {
 	Light l;
 	l.type = LIGHT_TYPE_SPOT;
 	l.position[0] = p_position.x;
@@ -135,6 +137,7 @@ void LightmapperRD::add_spot_light(const String &p_name, bool p_static, const Ve
 	l.static_bake = p_static;
 	l.size = p_size;
 	l.shadow_blur = p_shadow_blur;
+	l.shadow_caster_mask = p_shadow_caster_mask;
 	lights.push_back(l);
 
 	LightMetadata md;
@@ -143,7 +146,7 @@ void LightmapperRD::add_spot_light(const String &p_name, bool p_static, const Ve
 	light_metadata.push_back(md);
 }
 
-void LightmapperRD::add_area_light(const String &p_name, bool p_static, const Vector3 &p_position, const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, float p_range, float p_attenuation, const Vector3 &p_area_width, const Vector3 &p_area_height, float p_size, float p_shadow_blur, const Rect2 &p_texture_rect, float p_max_mipmap) {
+void LightmapperRD::add_area_light(const String &p_name, bool p_static, const Vector3 &p_position, const Vector3 &p_direction, const Color &p_color, float p_energy, float p_indirect_energy, float p_range, float p_attenuation, const Vector3 &p_area_width, const Vector3 &p_area_height, float p_size, float p_shadow_blur, const Rect2 &p_texture_rect, float p_max_mipmap, uint32_t p_shadow_caster_mask) {
 	Light l;
 	l.type = LIGHT_TYPE_AREA;
 	l.position[0] = p_position.x;
@@ -168,6 +171,7 @@ void LightmapperRD::add_area_light(const String &p_name, bool p_static, const Ve
 	l.static_bake = p_static;
 	l.size = p_size;
 	l.shadow_blur = p_shadow_blur;
+	l.shadow_caster_mask = p_shadow_caster_mask;
 
 	if (RenderingServer::get_singleton()->get_current_rendering_method() == "gl_compatibility") {
 		// area light textures unsupported in compat
@@ -558,7 +562,7 @@ void LightmapperRD::_create_acceleration_structures(RenderingDevice *rd, Size2i 
 			if (material.is_valid()) {
 				t.cull_mode = RSG::material_storage->material_get_cull_mode(material);
 			}
-			t.pad1 = 0; //make valgrind not complain
+			t.layer_mask = mi.data.cast_shadows ? mi.data.layer_mask : 0;
 			triangles.push_back(t);
 			slice_triangle_count.write[t.slice]++;
 		}

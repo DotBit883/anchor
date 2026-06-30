@@ -229,6 +229,8 @@ private:
 		Ref<Mesh> mesh;
 		float lightmap_scale = 0.0;
 		Vector<Ref<Material>> overrides;
+		uint32_t layer_mask = 1;
+		bool cast_shadows = true;
 	};
 
 	void _find_meshes_and_lights(Node *p_at_node, Vector<MeshesFound> &meshes, Vector<LightsFound> &lights, Vector<Vector3> &probes);

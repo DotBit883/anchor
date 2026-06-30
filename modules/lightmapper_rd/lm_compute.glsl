@@ -146,7 +146,7 @@ bool ray_box_test(vec3 p_from, vec3 p_inv_dir, vec3 p_box_min, vec3 p_box_max) {
 #define CLUSTER_TRIANGLE_ITERATION
 #endif
 
-uint trace_ray(vec3 p_from, vec3 p_to, bool p_any_hit, out float r_distance, out vec3 r_normal, out uint r_triangle, out vec3 r_barycentric) {
+uint trace_ray(vec3 p_from, vec3 p_to, bool p_any_hit, bool p_shadow_test, uint p_shadow_caster_mask, out float r_distance, out vec3 r_normal, out uint r_triangle, out vec3 r_barycentric) {
 	// World coordinates.
 	vec3 rel = p_to - p_from;
 	float rel_len = length(rel);
@@ -232,6 +232,9 @@ uint trace_ray(vec3 p_from, vec3 p_to, bool p_any_hit, out float r_distance, out
 							float distance;
 							vec3 barycentric;
 							if (ray_hits_triangle(p_from, dir, rel_len, vtx0, vtx1, vtx2, distance, barycentric)) {
+								if (p_shadow_test && (triangles.data[triangle_index].layer_mask & p_shadow_caster_mask) == 0u) {
+									continue;
+								}
 								if (p_any_hit) {
 									// Return early if any hit was requested.
 									return RAY_ANY;
@@ -311,16 +314,16 @@ uint trace_ray(vec3 p_from, vec3 p_to, bool p_any_hit, out float r_distance, out
 uint trace_ray_closest_hit_triangle(vec3 p_from, vec3 p_to, out uint r_triangle, out vec3 r_barycentric) {
 	float distance;
 	vec3 normal;
-	return trace_ray(p_from, p_to, false, distance, normal, r_triangle, r_barycentric);
+	return trace_ray(p_from, p_to, false, false, 0u, distance, normal, r_triangle, r_barycentric);
 }
 
-uint trace_ray_closest_hit_triangle_albedo_alpha(vec3 p_from, vec3 p_to, out vec4 albedo_alpha, out vec3 hit_position) {
+uint trace_ray_closest_hit_triangle_albedo_alpha(vec3 p_from, vec3 p_to, bool p_shadow_test, uint p_shadow_caster_mask, out vec4 albedo_alpha, out vec3 hit_position) {
 	float distance;
 	vec3 normal;
 	uint tidx;
 	vec3 barycentric;
 
-	uint ret = trace_ray(p_from, p_to, false, distance, normal, tidx, barycentric);
+	uint ret = trace_ray(p_from, p_to, false, p_shadow_test, p_shadow_caster_mask, distance, normal, tidx, barycentric);
 	if (ret != RAY_MISS) {
 		Vertex vert0 = vertices.data[triangles.data[tidx].indices.x];
 		Vertex vert1 = vertices.data[triangles.data[tidx].indices.y];
@@ -338,7 +341,7 @@ uint trace_ray_closest_hit_triangle_albedo_alpha(vec3 p_from, vec3 p_to, out vec
 uint trace_ray_closest_hit_distance(vec3 p_from, vec3 p_to, out float r_distance, out vec3 r_normal) {
 	uint triangle;
 	vec3 barycentric;
-	return trace_ray(p_from, p_to, false, r_distance, r_normal, triangle, barycentric);
+	return trace_ray(p_from, p_to, false, false, 0u, r_distance, r_normal, triangle, barycentric);
 }
 
 uint trace_ray_any_hit(vec3 p_from, vec3 p_to) {
@@ -346,7 +349,7 @@ uint trace_ray_any_hit(vec3 p_from, vec3 p_to) {
 	vec3 normal;
 	uint triangle;
 	vec3 barycentric;
-	return trace_ray(p_from, p_to, true, distance, normal, triangle, barycentric);
+	return trace_ray(p_from, p_to, true, false, 0u, distance, normal, triangle, barycentric);
 }
 
 // https://www.reedbeta.com/blog/hash-functions-for-gpu-rendering/
@@ -591,7 +594,7 @@ void trace_direct_light(vec3 p_position, vec3 p_normal, uint p_light_index, bool
 						vec4 hit_albedo = vec4(1.0);
 						vec3 hit_position;
 						// Offset the ray origin for AA, offset the light position for soft shadows.
-						uint ret = trace_ray_closest_hit_triangle_albedo_alpha(origin - light_disk_to_point * (bake_params.bias + length(disk_sample)), p_position - light_disk_to_point * dist, hit_albedo, hit_position);
+						uint ret = trace_ray_closest_hit_triangle_albedo_alpha(origin - light_disk_to_point * (bake_params.bias + length(disk_sample)), p_position - light_disk_to_point * dist, true, light_data.shadow_caster_mask, hit_albedo, hit_position);
 						if (ret == RAY_MISS) {
 							if (!sample_did_hit) {
 								sample_penumbra = 1.0;
@@ -632,7 +635,7 @@ void trace_direct_light(vec3 p_position, vec3 p_normal, uint p_light_index, bool
 					vec4 hit_albedo = vec4(1.0);
 					vec3 hit_position;
 					// Offset the ray origin for AA, offset the light position for soft shadows.
-					uint ret = trace_ray_closest_hit_triangle_albedo_alpha(origin + light_dir * (bake_params.bias + length(disk_sample)), light_pos, hit_albedo, hit_position);
+					uint ret = trace_ray_closest_hit_triangle_albedo_alpha(origin + light_dir * (bake_params.bias + length(disk_sample)), light_pos, true, light_data.shadow_caster_mask, hit_albedo, hit_position);
 					if (ret == RAY_MISS) {
 						if (!sample_did_hit) {
 							sample_penumbra = 1.0;
@@ -672,7 +675,7 @@ void trace_direct_light(vec3 p_position, vec3 p_normal, uint p_light_index, bool
 		for (uint iter = 0; iter < bake_params.transparency_rays; iter++) {
 			vec4 hit_albedo = vec4(1.0);
 			vec3 hit_position;
-			uint ret = trace_ray_closest_hit_triangle_albedo_alpha(p_position + shadow_dir * bake_params.bias, light_pos, hit_albedo, hit_position);
+			uint ret = trace_ray_closest_hit_triangle_albedo_alpha(p_position + shadow_dir * bake_params.bias, light_pos, true, light_data.shadow_caster_mask, hit_albedo, hit_position);
 			if (ret == RAY_MISS) {
 				if (!did_hit) {
 					penumbra = 1.0;
